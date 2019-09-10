@@ -13,7 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace openCvWinCam
+namespace CSharpCpp
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -23,60 +23,50 @@ namespace openCvWinCam
         public MainWindow()
         {
             InitializeComponent();
+            this.lbl.Content = string.Join(" ", buf.Select(r => r.ToString("X2")));
         }
 
-        public WriteableBitmap ImgSrc = new WriteableBitmap(640, 360, 96, 96, PixelFormats.Bgr24, null);
-        opencvwrapper.OpenCvWrapper obj = new opencvwrapper.OpenCvWrapper();
-        byte[] imgbuffer = new byte[640 * 320 * 3];
+        byte[] buf = new byte[640 * 320 * 3];
+        public WriteableBitmap ImgSrc = new WriteableBitmap(640, 320, 96, 96, PixelFormats.Bgr24, null);
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+
+        private void Button_Click(object sender, RoutedEventArgs e)
         {
-            this.img.Source = ImgSrc;
-            this.lbl.Content = obj.SayHelloWorld();
-            
-            Task.Run(() =>
+            unsafe
             {
-                var res = obj.OpenCamera();
+                void* p = ImgSrc.BackBuffer.ToPointer();
 
-                Dispatcher.Invoke(() => this.log.AppendText($"camera open result : {res} {Environment.NewLine}"));
-
-                
-
-                while (res)
+                TestCppDll.SetCsharpInstance s = new TestCppDll.SetCsharpInstance();
+                this.img.Source = ImgSrc;
+                Task.Run(() =>
                 {
-                    var returnvalue = obj.FeedImg(imgbuffer);
+                    while (true)
+                    {
+                        //s.SetByteArrayWithRandom(buf);
 
-                    Dispatcher.Invoke(() => this.log.AppendText($"return value : {returnvalue} {Environment.NewLine}"));
+                        s.FeedBackBuffer2(p);
 
-                    Dispatcher.Invoke(() => {
-                        var tmpimg = BitmapImage.Create(640, 320, 96, 96, PixelFormats.Bgr24, BitmapPalettes.WebPalette, imgbuffer, 640 * 3);
-                        this.img.Source = tmpimg;
-                    });
+                        Dispatcher.Invoke(() =>
+                        {
+                            ImgSrc.Lock();
+                            ImgSrc.AddDirtyRect(new Int32Rect(0, 0, 640, 320));
+                            ImgSrc.Unlock();
+                        });
 
-                    //ImgSrc.Lock();
-                    //ImgSrc.WritePixels(new Int32Rect(0, 0, 640, 320), imgbuffer, 640 * 3, 0);
-                    //ImgSrc.Unlock();
+                        //Dispatcher.Invoke(() =>
+                        //{
+                        //    ImgSrc.Lock();
+                        //    ImgSrc.WritePixels(new Int32Rect(0, 0, 640, 320), buf, 640 * 3, 0);
+                        //    ImgSrc.Unlock();
+                        //    //var tmpimg = BitmapImage.Create(640, 320, 96, 96, PixelFormats.Bgr24, BitmapPalettes.WebPalette, buf, 640 * 3);
+                        //    //this.img.Source = tmpimg;
+                        //});
+                    }
+                });
 
-                    //var image = obj.ReadImage2();
-                    //Dispatcher.Invoke(() => this.log.AppendText($"image read : {image} {Environment.NewLine}"));
-
-                    //if (image != null)
-                    //{
-                    //    ImgSrc.WritePixels(new Int32Rect(0, 0, 640, 320), image, 640 * 3, 0);
-                    //}
-
-                    //if (image != null)
-                    //{
-                    //    Dispatcher.Invoke(() => this.log.AppendText($"{image.Height} {image.Width} {Environment.NewLine}"));
-                    //}
-                    //else
-                    //{
-                    //    Dispatcher.Invoke(() => this.log.AppendText($"image null {Environment.NewLine}"));
-                    //}
-
-                    //Dispatcher.Invoke(() => this.img.Source = image);
-                }
-            });
+                //s.SetByteArrayWithRandom(buf);
+                //this.lbl.Content = string.Join(" ", buf.Select(r => r.ToString("X2")));
+            }
         }
     }
 }
